@@ -1,0 +1,79 @@
+# RSS database 
+rss:
+    output: './'
+    rssdir: '/Users/ando/bin/salt_red/saltdatabase'
+    caldir: '/Users/ando/bin/salt_red/saltdatabase/caldir/'
+    extdir: '/Users/ando/bin/salt_red/saltdatabase/suth_extinct_burgh.dat'
+    linelist_dir: '/Users/ando/bin/salt_red/saltdatabase/linelists/'
+
+#  Identify: parameters
+iraf.identify:
+
+    function: 'chebyshev'
+    order: 5
+    fwidth: 6.
+    cradius: 6.
+
+# Reidentify parameters
+iraf.reidentify:
+
+    interactive: 'no'
+    newaps: 'yes'
+    override: 'no'
+    refit: 'yes'
+    nlost: 20
+    verbose: 'yes'
+    trace: 'yes'
+    section: 'middle line'
+    shift: 'INDEF'
+    search: 'INDEF'
+    addfeatures: 'no'
+
+# Iraf fitcoords
+iraf.fitcoords:
+
+    interactive: 'no'
+    combine: 'no'
+    functio: 'legendre'
+    xorder: 5
+    yorder: 3
+
+#  Transform:  Wavelength calibration 
+iraf.transform:
+
+    interptype: 'linear'
+    flux: 'yes'
+    blank: 'INDEF'
+    x1: 'INDEF'
+    x2: 'INDEF'
+    dx: 'INDEF'
+    y1: 'INDEF'
+    y2: 'INDEF'
+    dy: 'INDEF'
+
+# Background substraction
+iraf.fit1d:
+    axis: 2
+    interactive: 'no'
+    naverage: 1
+    function: 'chebyshev'      
+    order: 5
+    low_reject: 2.
+    high_reject:  1.5
+    niterate: 5
+    grow: 0.
+
+# Apall 
+iraf.apall:
+
+    format: 'onedspec'
+    interactive: 'no'
+    nfind: 1
+    line: 'INDEF'    
+    llimit: -30
+    ulimit: 30
+    ylevel: 'INDEF'    
+    t_order: 6
+    t_nsum: 50
+    t_step: 20
+
