@@ -1,0 +1,74 @@
+iraf.apall:
+    nfind: 1
+    apertures: ""
+    format: "onedspec"
+    references: ""
+    profiles: ""
+
+    interactive: 'yes'
+    find: 'yes'
+    recenter: 'yes'
+    resize: 'yes'
+    edit: 'yes'
+    trace: 'yes'
+    fittrace: 'yes'
+    extract: 'yes'
+    extras: 'yes'
+    review: 'yes'
+
+    line: 'INDEF'
+    nsum: 10
+
+    lower: -5
+    upper: 5
+
+    # DEFAULT BACKGROUND PARAMETERS
+
+    b_funct: 'chebyshev'
+    b_order: 1
+    b_sampl: '-80:-30,30:80'
+    b_low_rej: 2.
+    b_high_rej: 1.5
+    b_niterate: 5    
+
+    # APERTURE CENTERING PARAMETERS
+
+    width: 5.
+    radius: 10.
+    thresho: 0.
+
+    npeaks: 'INDEF'
+    llimit: 'INDEF'
+    ulimit: 'INDEF'
+    ylevel: 0.1
+    peak: 'yes'
+
+    # RESIZING PARAMETERS
+    ylevel:  0.1
+     
+    # TRACING PARAMETERS
+
+    t_nsum:  100
+    t_step:  30
+    t_nlost:  10
+    t_funct:  'legendre'
+    t_order:  7
+    t_sampl:  "*"
+    t_naver:  1
+    t_niter:  5
+    t_low_r:  3. 
+    t_high_:  3.
+                                
+    # EXTRACTION PARAMETERS
+
+    backgro:  "none"
+    skybox:   1
+    weights:   "none"
+    pfit:   "fit1d"
+    clean:   "no"
+    saturat:  "INDEF"
+    readnoi:  0.
+    gain:     1.
+    lsigma:   4.
+    usigma:   4.
+    nsubaps:  1
