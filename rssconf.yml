@@ -1,10 +1,10 @@
 # RSS database 
 rss:
     output: './'
-    rssdir: '/Users/ando/bin/salt_red/saltdatabase'
-    caldir: '/Users/ando/bin/salt_red/saltdatabase/caldir/'
-    extdir: '/Users/ando/bin/salt_red/saltdatabase/suth_extinct_burgh.dat'
-    linelist_dir: '/Users/ando/bin/salt_red/saltdatabase/linelists/'
+    rssdir: '/home/rajoelimananaa/software/saltpy/saltdatabase'
+    caldir: '/home/rajoelimananaa/software/saltpy/saltdatabase/caldir/'
+    extdir: '/home/rajoelimananaa/software/saltpy/saltdatabase/caldir/suth_extinct_burgh.dat'
+    linelist_dir: '/home/rajoelimananaa/software/saltpy/saltdatabase/linelists/'
 
 #  Identify: parameters
 iraf.identify:
