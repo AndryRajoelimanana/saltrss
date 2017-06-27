@@ -102,6 +102,31 @@ def load_config(config_file, config_default='/home/rajoelimananaa/software/saltp
     return config    
 
 
+def apall_config(config_file, config_default='/home/rajoelimananaa/software/saltpy/apall_conf.yml'):
+    config = yaml.safe_load(open(config_default))
+    custom_config = {}
+    if os.path.exists(config_file):
+        custom_config = yaml.safe_load(open(config_file))
+        
+    config = config_merge(custom_config, config)
+
+    sections = ['iraf.apall',]
+    iraf.noao(_doprint=0)
+    iraf.twodspec(_doprint=0)
+    iraf.onedspec(_doprint=0)
+    iraf.apextract(_doprint=0)
+    iraf.apextract.unlearn()
+    iraf.apall.unlearn()
+    iraf.apsum.unlearn()
+    iraf.apextract.setParam('dispaxis',1)
+
+    for section_name in sections:
+        params = config[section_name].items()
+        for param_id in params:
+            eval(section_name).setParam(param_id[0], param_id[1])
+    return config    
+
+
 # Prepare images for reduction
 def prepare_image(images, do_error=False):
 
