@@ -239,14 +239,14 @@ def read_fromfile(infile):
     return listout     
 
        
-def reduce(objlist,objarclist,stdlist='', stdarclist='', logfile='saltlongslit.log', do_error=True):
+def reduce(objlist,objarclist,stdlist='', stdarclist='', rssconfig='rssconfig.yml' , logfile='saltlongslit.log', do_error=True):
 
     inobjlist = np.loadtxt(objlist, unpack=True, ndmin=1, dtype=str)
     inobjarclist = np.loadtxt(objarclist, unpack=True, ndmin=1, dtype=str)
     arcfile=inobjarclist[0]
 
     # get parameter files to dict    
-    config = rt.load_config('rssconfig.yml')
+    config = rt.load_config(rssconfig)
 
     if not os.path.exists('database'): os.system('mkdir database')
     if not os.path.isfile('login.cl'): os.system('mkiraf')
