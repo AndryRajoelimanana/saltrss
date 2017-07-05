@@ -1,1 +1,1 @@
-# saltrss
+# saltrss SALT/REDUCTION pipeline
