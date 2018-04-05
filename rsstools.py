@@ -79,7 +79,7 @@ def loadparam(config, sections):
             eval(section_name).setParam(param_id[0], param_id[1])    
 
 # Load configuration file and merge it with the default one            
-def load_config(config_file, config_default='/home/rajoelimananaa/software/saltpy/rssconf.yml'):
+def load_config(config_file, config_default='/Users/ando/andry/research/Make_software/saltrss/rssconf.yml'):
     config = yaml.safe_load(open(config_default))
     custom_config = {}
     if os.path.exists(config_file):
@@ -102,7 +102,7 @@ def load_config(config_file, config_default='/home/rajoelimananaa/software/saltp
     return config    
 
 
-def apall_config(config_file, config_default='/home/rajoelimananaa/software/saltpy/apall_conf.yml'):
+def apall_config(config_file, config_default='/Users/ando/andry/research/Make_software/saltrss/apall_conf.yml'):
     config = yaml.safe_load(open(config_default))
     custom_config = {}
     if os.path.exists(config_file):

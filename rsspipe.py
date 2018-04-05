@@ -1,4 +1,5 @@
-#! /usr/bin/env python									                             
+#! /usr/bin/env python	
+'''								                             
 #########################################################################################
 #                                                                                       #							
 #   Dr. Andry Rajoelimanana                                                             #	
@@ -6,11 +7,12 @@
 #   SALT/RSS longslit reduction                                                         #
 #                                                                                       #		
 #########################################################################################
+'''
 
 import os
 from pyraf import iraf
 from astropy.io import fits
-
+from shutil import copy2
 import rsstools as rt
 import numpy as np
 
@@ -22,252 +24,216 @@ iraf.stsdas(_doprint=0)
 iraf.analysis(_doprint=0)
 iraf.fitting(_doprint=0)
 
-# Wavelength Calibration of the ARC spectra       
-def rssidentify(arclist, config):
 
-    saltreddir = config['rss']['rssdir'] 
-    ref_spec= os.path.splitext(arclist)[0]
-    reference= rt.makesetups(arclist,"arc")
-    referfits = reference+'.fits'  
-    referid_db = saltreddir+"/database/id"+str(reference)
-    referfits_db = saltreddir+'/'+referfits   
-    coordlist= reference.split('_')[0].lower()+'.dat'       
-    coordfile = config['rss']['linelist_dir']+str(coordlist)
+class arc(object):
+    def __init__(self, name):
+        self.name = name 
+        self.noext = os.path.splitext(self.name)[0]
+        self.idname = rt.makesetups(self.name,"arc")
+        self.idfits = self.idname+'.fits'
+        self.linelist = self.idname.split('_')[0].lower()+'.dat'  
+    def __str__(self):
+        return self.name+' :  idname --> '+self.idname
+            
 
-    rt.loadparam(config, ['iraf.identify', 'iraf.reidentify', 'iraf.fitcoords'])
-      
-    if reference == 'NONE_NONE_NONE_NONE_NONE':
-        print "***** rssidentify error"
-        print "***** We can not get your spectral setup *****"
-        return
-
-
-    if os.path.isfile(coordfile):
-        rt.getsh('cp %s ./' %  (coordfile))
-    else :
-        print "***** rssidentify error *** The coordinate list for this arc IS NOT in our directory *****"
-        return            
-    
-    if os.path.isfile(referfits_db) and os.path.isfile(referid_db):
-        rt.getsh('cp %s ./'  % (referfits_db))
-        if not os.path.exists('database'): os.system('mkdir database')
-        rt.getsh('cp %s database/'  % (referid_db))
-
-    else:
-        print referfits_db, referid_db
-        print "This setup is not in our database (setup = %s)" % (reference)
-        rt.getsh('cp %s ./%s'  % (arclist, referfits))
-        rt.rsswave(referfits)
-        iraf.identify(reference, coordlist=coordlist, mode='h')
-        iraf.reidentify(reference, reference, coordlist=coordlist, mode='h')
-        iraf.fitcoord(reference, mode='h')
-
-        os.system('cp '+referfits+' '+saltreddir+'/'+referfits)
-        os.system('cp database/id'+reference+' '+saltreddir+'/database/id'+reference)
-        os.system('cp database/fc'+reference+' '+saltreddir+'/database/fc'+reference)
+class target(object):
+    def __init__(self, name):
+        rt.rmexist(['f'+name])
+        copy2(name,'f'+name)
+        self.name = 'f'+name 
+        self.noext = os.path.splitext(self.name)[0]
+        self.var = self.insert_key('_var.fits')
+        self.wave = self.insert_key('w.fits')
+        self.bkg = self.insert_key('ws.fits')
+        self.flux2d = self.insert_key('wsf.fits')
+        self.sky = self.insert_key('sky.fits')
+        self.wave_var = self.insert_key('w_var.fits') 
+        self.bkg_var = self.insert_key('ws_var.fits')
+        self.bkg_err = self.insert_key('ws_err.fits')        
+        self.flux2d_var = self.insert_key('wsf_var.fits')   
+        self.flux2d_err = self.insert_key('wsf_err.fits')     
+    def insert_key(self, key):
+        return self.noext+key
 
 
-    print "'***** Reducing of ARCs *****'"
+class standard(target):
+    def __init__(self,name):
+        target.__init__(self,name)
+        self.idname = rt.makesetups(self.name,'std')
+        self.date = self.name.split('P')[1][0:8]
+        self.sens = self.idname+'.fits'
+        self.sensout = self.idname+'_'+self.date
+        self.object= (rt.header(self.name,'OBJECT')).lower()
+        self.oned0 = self.insert_key('ws.0001.fits')
+        self.oned = self.insert_key('ws1d.fits')    
+    def __str__(self):
+        return self.name+' : sensitivity function --> '+self.sens        
 
-    arc_id = "database/id"+str(ref_spec)
-    arc_fc = "database/fc"+str(ref_spec)
 
-    if not os.path.isfile(arc_id) or not os.path.isfile(arc_fc):
-        iraf.reidentify(reference, ref_spec, coordlist=coordlist, mode='h')
-        iraf.reidentify(ref_spec, ref_spec, coordlist=coordlist, mode='h')        
-        iraf.fitcoord(ref_spec, mode='h')
-       
-# Wavelength calibration, background substraction, and flux calibration of the target spectra        
-def rssextractone(images, arcl, config, logfile, do_error=False):
-
-    print "'***** Reducing of objects ***** '"
-    infiles = os.path.splitext(images)[0]
-    ref_spec = os.path.splitext(arcl)[0]
-    if os.path.isfile('b'+images): 
-        hduorig= fits.open('b'+images)
-        os.remove(images)
-    else:
-        hduorig= fits.open(images)
-        os.system('mv '+images+'  b'+images)
-
-    hduimg = fits.PrimaryHDU(data=hduorig[0].data,header=hduorig[0].header)
-    hduimg.writeto(images)
-    hduvarimg = fits.PrimaryHDU(data=hduorig[1].data,header=hduorig[0].header)
-    rt.rmexist([infiles+'_var.fits'])
-    hduvarimg.writeto(infiles+'_var.fits')  
-    rt.prepare_image(images, do_error=do_error)
-    rssidentify(arcl, config)
-    nxpix = rt.header(images, 'NAXIS1')
+class rsspipe(object):
+    def __init__(self, objfile, objarcfile, stdfile=None, stdarcfile=None,\
+                 rssconfigfile=None, logfile=None, do_error=True, \
+                 rssdatadir = None):
+        self.objectfile = objfile
+        self.arcfile = objarcfile
+        # read object and arc list 
+        objlist = self.readfile(self.objectfile)
+        self.objlist = []
+        for obj in objlist:
+            self.objlist.append(target(obj))
+        self.arclist = self.readfile(self.arcfile)[0]
+        self.arc = arc(self.arclist)
+        # load configuration
+        self.rssconfigfile = rssconfigfile if rssconfigfile is not None else 'rssconfig.yml'
+        self.rssconfig = rt.load_config(self.rssconfigfile)
+        # read standard spectrophotometric
+        if stdfile is not None:
+            self.stdfile = stdfile
+            stdlist = self.readfile(self.stdfile)
+            self.stdlist = []
+            for std in stdlist:
+                self.stdlist.append(standard(std))
+            if stdarcfile is not None:
+                self.stdarcfile = stdarcfile
+                stdarclist = self.readfile(stdarcfile)
+                self.stdarclist = standard(stdarclist[0])                
+            else:
+                self.stdarclist = self.arc 
+        # loading config path file
+        self.logfile = logfile if logfile is not None else 'saltlongslit.log'
+        self.set_configfile(rssdatadir)
+        self.do_error = do_error
         
-    # output wavelength calibrated, background substracted file
-    wavefits = infiles+'w.fits'
-    backfits = infiles+'ws.fits'
-    tmpfit = infiles+'sky.fits'
-    error_file = infiles+'_var.fits'
-    wavefits_err = infiles+'w_var.fits'
-    backfits_err = infiles+'ws_var.fits'
-
-    rt.loadparam(config, ['iraf.transform', 'iraf.fit1d'])
-    # check if the error file exist       
-    if do_error:
-        iraf.errorpars.errtype='uniform'
-        iraf.errorpars.resample='no'
-        iraf.samplepars.axis=1
-        iraf.samplepars.setParam('naverage', config['iraf.fit1d']['naverage'])
-        iraf.samplepars.setParam('low_reject', config['iraf.fit1d']['low_reject'])
-        iraf.samplepars.setParam('high_reject', config['iraf.fit1d']['high_reject'])
-        iraf.samplepars.setParam('niterate', config['iraf.fit1d']['niterate'])
-        iraf.samplepars.setParam('grow', config['iraf.fit1d']['grow'])
+    def readfile(self, filename):
+        with open(filename) as f:
+            lines = f.read().splitlines()
+        return lines
+        
+    def set_configfile(self, rssdatadir):
+        if rssdatadir is not None:
+            rssdatadir = rssdatadir
+        else: 
+            rssdatadir = '/Users/ando/bin/salt_red/saltdatabase'
+        while not os.path.exists(rssdatadir):
+            print("RSS data directory "+str(rssdatadir)+" IS NOT valid")
+            rssdatadir = raw_input('Enter a correct path for RSS data directory:  ')
+        self.rssdatadir = rssdatadir
+        self.caldir = self.rssdatadir+'/caldir/'
+        self.extinction = self.caldir+'/suth_extinct_burgh.dat'
+        self.linelist_dir = self.rssdatadir+'/linelists/' 
                
-    rt.rmexist([wavefits, backfits, wavefits_err, backfits_err])
-    # Wavelength calibration	   
-    iraf.transform(infiles, wavefits, fitnames=ref_spec, logfiles = logfile)
-    iraf.fit1d(wavefits, tmpfit, "fit", axis=2)                    
-    iraf.imarith(wavefits, "-", tmpfit, backfits)
-
-    # Calibrated error file
-    if do_error:
-        iraf.transform(error_file, wavefits_err, fitnames=ref_spec, logfiles = logfile)
-        iraf.gfit1d(wavefits, 'tmptab.tab', function=config['iraf.fit1d']['function'], order=config['iraf.fit1d']['order'], xmin=1, xmax=nxpix, interactive='no')		       
-        iraf.tabpar('tmptab.tab',"rms", 1, Stdout=logfile)
-        rmsval = float(iraf.tabpar.value)
-        tmpval=rmsval*rmsval
-        print 'RMS of the fit (for VAR plane propagation) = %s ' %rmsval
-        iraf.imexpr("a+b",backfits_err, a=wavefits_err, b=tmpval)
-
-    print "**** Done with image %s ****" % (images)  
-
-
-# Flux calibration using input sensitivity curve    
-def rssfluxdefine(images,calflux,config, do_error=False):
-
-    print "We will use setups file: %s" %(calflux)
-     
-    obj_nofits = os.path.splitext(images)[0]+'ws'
-    inobj = obj_nofits+'.fits'
-    inobj_err = obj_nofits+'_var.fits'
-    extinct = config['rss']['extdir']
-    calfits = obj_nofits+'f.fits'   
-    rt.rmexist([calfits])
-    
-    if not rt.header(inobj_err,'AIRMASS'): rt.rssairmass(inobj_err)
-
-    iraf.longslit.calibrate(input=inobj, output=calfits, extinct='yes', flux='yes',
-                            fnu='no',sensitivity=calflux, extinction=extinct)
-    rt.putheader(calfits, 'STDNAME', calflux)
- 
-    if do_error: 
-        calfits_err = obj_nofits+'f_var.fits'
-        obj_err = obj_nofits+'f_err.fits'
-        rt.rmexist([calfits_err, obj_err])
-        # Convert variance to error
-        iraf.imexpr("sqrt(a)", obj_err, a = inobj_err)
-        iraf.longslit.calibrate(input=obj_err, output=calfits_err, extinct='yes',
-                                flux='yes',observa='saao',fnu='no', sensitivity=calflux,
-                                extinction=extinct)
-             
-# Estimate sensitivity curve using spectrophotometric standard
-def rssstdred(stdlist,stdarclist, sens, config, logfile):
-    
-    instdlist = np.loadtxt(stdlist, unpack=True, ndmin=1, dtype=str)
-    instdarclist = np.loadtxt(stdarclist, unpack=True, ndmin=1, dtype=str)
-    stdarcfile=instdarclist[0]
-    saltreddir = config['rss']['rssdir'] 
-    caldir = config['rss']['caldir']
-    extinct= config['rss']['extdir']
-
-
-    inmake=str(instdlist[0])
-    stdsetup = rt.makesetups(stdarcfile,'std')
-    
-    rssdate = inmake.split('P')[1][0:8]
-    std_out = str(stdsetup)+"_"+rssdate
-    sens_out = std_out+'.fits'
-    std_fits= str(std_out)+".fits"
-    print "Here is the standard setup file : %s" %(std_fits)
-    rt.rmexist([std_out,std_fits])
-           
-    for instdl in instdlist: 
-
-        rssextractone(instdl,stdarcfile, config, logfile, do_error=False)        
-        obj_nofits = os.path.splitext(instdl)[0]+'ws'
-        inobj = obj_nofits+'.fits'
-        star_name= (rt.header(instdl,'OBJECT')).lower()
-        star_database = caldir+str(star_name)+".dat"
-        onedfits = obj_nofits+"1d.fits"
-        onedfits1 = obj_nofits+".0001.fits"
-        rt.rmexist([onedfits,onedfits1])
-
-        if not os.path.isfile(star_database):
-            print ""
-            print "*****  Cannot find file ",star_database, "*****"
-            print "*****  in the directory caldir *****"
-            print ""
-            return
-        rt.loadparam(config, ['iraf.apall'])
-        iraf.apall(inobj, b_niterate=5, b_sample='-100:-40,40:100', b_high_reject=1.5, b_low_reject=2)
-
-        os.system('mv %s %s' %  (onedfits1,onedfits))
-
-        if not rt.header(onedfits,'AIRMASS'): rt.rssairmass(onedfits)
-        print "**** start running standard %s" % (std_out)
-
-        iraf.standard(input=onedfits, output=std_out, caldir=caldir, interact='yes',
-                      star_name=star_name, extinct=extinct)
-        
-    # Sensitivity files    
-    iraf.sensfunc(std_out, sens_out, interactive= 'yes', extinct=extinct,
-                  newextinction='extinct.dat')
-    rt.getsh('cp %s %s' %  (sens_out,str(saltreddir))) 
-    rt.putheader(sens_out, 'FITSNAME', instdlist)
-
-    for instdl in instdlist:    
-        obj_nofits = os.path.splitext(instdl)[0]+'ws'
-        inobj = obj_nofits+'.fits'
-        in_cal = obj_nofits+'1d.fits'
-        out_cal = obj_nofits+'1dp.fits'
-        rt.rmexist([out_cal])
-        iraf.calibrate(in_cal, output=out_cal, sensitivity=std_fits, extinction=extinct)
-
-    return std_fits
-            
-        
-def read_fromfile(infile):
-    listout=[]
-    with open(infile) as FileObj:
-        listout = FileObj.read().splitlines()
-    return listout     
-
-       
-def reduce(objlist,objarclist,stdlist='', stdarclist='', rssconfig='rssconfig.yml' , logfile='saltlongslit.log', do_error=True):
-
-    inobjlist = np.loadtxt(objlist, unpack=True, ndmin=1, dtype=str)
-    inobjarclist = np.loadtxt(objarclist, unpack=True, ndmin=1, dtype=str)
-    arcfile=inobjarclist[0]
-
-    # get parameter files to dict    
-    config = rt.load_config(rssconfig)
-
-    if not os.path.exists('database'): os.system('mkdir database')
-    if not os.path.isfile('login.cl'): os.system('mkiraf')
-
-    # check Flux calibration file
-    
-    if (stdlist != '' and os.path.splitext(stdlist)[0] == stdlist):
-        stdlist = rssstdred(stdlist, stdarclist,'yes', config, logfile)
-        print stdlist
-        if (os.path.splitext(stdlist)[0] != stdlist and os.path.isfile(stdlist)): 
-             print 'Good to go'
+    def rssidentify(self, arc):
+        if not os.path.exists('database'): os.system('mkdir database')
+        rt.loadparam(self.rssconfig, ['iraf.identify', 'iraf.reidentify', 'iraf.fitcoords'])
+        coordfile = self.linelist_dir+arc.linelist
+        while not os.path.exists(coordfile):
+            print("***** rssidentify error *** The coordinate "+str(coordfile)+" IS NOT in our directory *****")
+            coordfile = raw_input('Enter a correct path for coordinate files:  ')
+        arc.coordfile = coordfile
+        copy2(coordfile, './')
+        # check if the setup has been already identified before
+        if os.path.isfile(self.rssdatadir+"/database/id"+arc.idname) and \
+                        os.path.isfile(self.rssdatadir+"/"+arc.idfits):
+            copy2(self.rssdatadir+"/database/id"+arc.idname, 'database/')
+            copy2(self.rssdatadir+"/"+arc.idfits,'./')
         else:
-             return  
-    for inobj in inobjlist:
-             
-        print "Starting with object %s and %s" %(inobj,arcfile)
-        rssextractone(inobj, arcfile, config, logfile, do_error=do_error)
-        if (os.path.splitext(stdlist)[0] != stdlist and os.path.isfile(stdlist)):
-            print "***** Standard file found =  %s *****" %(stdlist)
-            rssfluxdefine(inobj, stdlist, config, do_error=do_error)
+            copy2(arc.name, arc.idfits)
+            rt.rsswave(arc.idfits)
+            iraf.identify(arc.idname, coordlist=coordfile, mode='h')
+            iraf.reidentify(arc.idname, arc.idname, coordlist=coordfile, mode='h')  
+            iraf.fitcoord(arc.idname, mode='h')
+            copy2(arc.idfits, self.rssdatadir+'/'+arc.idfits)
+            copy2('database/id'+arc.idname, self.rssdatadir+'/database/id'+arc.idname)
+            copy2('database/fc'+arc.idname, self.rssdatadir+'/database/fc'+arc.idname)
+        print("***** Reducing of ARCs *****")
+        if not os.path.isfile("database/id"+arc.noext) or not os.path.isfile("database/fc"+arc.noext):
+            iraf.reidentify(arc.idname, arc.noext, coordlist=coordfile, mode='h')
+            iraf.reidentify(arc.noext, arc.noext, coordlist=coordfile, mode='h')        
+            iraf.fitcoord(arc.noext, mode='h')
             
+    def reduce2d(self, obj, arc, do_error=None):
+        images = obj.name  
+        do_error = do_error if do_error is not None else self.do_error
+        hduorig= fits.open(images)
+        os.remove(images)
+        hduimg = fits.PrimaryHDU(data=hduorig[0].data,header=hduorig[0].header)
+        hduimg.writeto(images)
+        hduvarimg = fits.PrimaryHDU(data=hduorig[1].data,header=hduorig[0].header)
+        rt.rmexist([obj.var])
+        hduvarimg.writeto(obj.var)    
+        rt.prepare_image(images, do_error=do_error)
+        self.rssidentify(arc)
+        nxpix = rt.header(images, 'NAXIS1')
+        rt.loadparam(self.rssconfig, ['iraf.transform', 'iraf.fit1d'])
+        config= self.rssconfig
+        if self.do_error:
+            iraf.errorpars.errtype='uniform'
+            iraf.errorpars.resample='no'
+            iraf.samplepars.axis=1
+            iraf.samplepars.setParam('naverage', config['iraf.fit1d']['naverage'])
+            iraf.samplepars.setParam('low_reject', config['iraf.fit1d']['low_reject'])
+            iraf.samplepars.setParam('high_reject', config['iraf.fit1d']['high_reject'])
+            iraf.samplepars.setParam('niterate', config['iraf.fit1d']['niterate'])
+            iraf.samplepars.setParam('grow', config['iraf.fit1d']['grow'])                   
+        rt.rmexist([obj.wave, obj.bkg, obj.wave_var, obj.bkg_var])
+        # Wavelength calibration	   
+        iraf.transform(obj.noext, obj.wave, fitnames = arc.noext, logfiles = self.logfile)
+        iraf.fit1d(obj.wave, obj.sky, "fit", axis=2)                    
+        iraf.imarith(obj.wave, "-", obj.sky, obj.bkg)
+        # Calibrated error file
+        if do_error:
+            iraf.transform(obj.var, obj.wave_var, fitnames = arc.noext, logfiles = self.logfile)
+            iraf.gfit1d(obj.wave, 'tmptab.tab', function=config['iraf.fit1d']['function'], order=config['iraf.fit1d']['order'], xmin=1, xmax=nxpix, interactive='no')		       
+            iraf.tabpar('tmptab.tab',"rms", 1, Stdout=self.logfile)
+            rmsval = float(iraf.tabpar.value)
+            tmpval=rmsval*rmsval
+            print('RMS of the fit (for VAR plane propagation) = %s ' %rmsval)
+            iraf.imexpr("a+b",obj.bkg_var, a=obj.wave_var, b=tmpval)
+            print("**** Done with image %s ****" % (images)) 
             
-            
-
+    # Estimate sensitivity curve using spectrophotometric standard
+    def rssstdred(self, obj, arc):
+        rt.rmexist([obj[0].sensout,obj[0].sensout+'.fits'])
+        for std in obj:
+            self.reduce2d(std, arc, do_error=False)
+            rt.loadparam(self.rssconfig, ['iraf.apall'])
+            std_data = self.caldir+'/'+std.object+".dat"
+            rt.rmexist([std.oned,std.oned0])
+            while not os.path.isfile(std_data):
+                print("Cannot find file ", std_data)
+                std_data = raw_input('Enter a star database:  ')
+            iraf.apall(std.bkg, b_niterate=5, b_sample='-100:-40,40:100', b_high_reject=1.5, b_low_reject=2)
+            os.system('mv %s %s' %  (std.oned0,std.oned))
+            if not rt.header(std.oned,'AIRMASS'): rt.rssairmass(std.oned)
+            iraf.standard(input=std.oned, output=std.sensout, caldir=self.caldir, interact='yes',
+                      star_name=std.object, extinct=self.extinction)
+        # Sensitivity files    
+        iraf.sensfunc(std.sensout, std.sensout+'.fits', interactive= 'yes', extinct=self.extinction,
+                      newextinction='extinct.dat')
+        #rt.putheader(std.sensout+'.fits', 'FITSNAME', ','.join([std.name for std in obj]))
+        rt.getsh('cp %s %s' %  (std.sensout+'.fits',self.rssdatadir)) 
+        return std.sensout+'.fits'
+        
+    def rssflux(self, obj, sens, do_error=None):
+        do_error = do_error if do_error is not None else self.do_error    
+        rt.rmexist([obj.flux2d])
+        if not rt.header(obj.bkg_var,'AIRMASS'): rt.rssairmass(obj.bkg_var)
+        iraf.longslit.calibrate(input=obj.bkg, output=obj.flux2d, extinct='yes',
+                                flux='yes', fnu='no',sensitivity=sens, 
+                                extinction=self.extinction)
+        rt.putheader(obj.flux2d, 'STDNAME', sens)
+        if do_error:
+            rt.rmexist([obj.flux2d_var, obj.flux2d_err]) 
+            # Convert variance to error
+            iraf.imexpr("sqrt(a)", obj.bkg_err, a = obj.bkg_var)
+            iraf.longslit.calibrate(input=obj.bkg_err, output=obj.flux2d_err, extinct='yes',
+                                    flux='yes',observa='saao',fnu='no', sensitivity=sens,
+                                    extinction=self.extinction)
+                                    
+#import sys
+#sys.path.insert(0,'/Users/ando/andry/research/Make_software/saltrss')
+#test = rsspipe('obj1', 'arc1', stdfile='std1')
+#bbb = test.rssstdred(test.stdlist, test.stdarclist)
+#for inobj in test.objlist:
+#    test.reduce2d(inobj, test.arc)
+#    test.rssflux(inobj, bbb)
