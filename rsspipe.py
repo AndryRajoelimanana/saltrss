@@ -31,7 +31,10 @@ class arc(object):
         self.noext = os.path.splitext(self.name)[0]
         self.idname = rt.makesetups(self.name,"arc")
         self.idfits = self.idname+'.fits'
-        self.linelist = self.idname.split('_')[0].lower()+'.dat'  
+        self.linelist = self.idname.split('_')[0].lower()+'.dat'
+        self.header = self.read_header()
+    def read_header(self):
+        return fits.getheader(self.name)  
     def __str__(self):
         return self.name+' :  idname --> '+self.idname
             
@@ -51,7 +54,10 @@ class target(object):
         self.bkg_var = self.insert_key('ws_var.fits')
         self.bkg_err = self.insert_key('ws_err.fits')        
         self.flux2d_var = self.insert_key('wsf_var.fits')   
-        self.flux2d_err = self.insert_key('wsf_err.fits')     
+        self.flux2d_err = self.insert_key('wsf_err.fits')
+        self.header = self.read_header()
+    def read_header(self):
+        return fits.getheader(self.name)      
     def insert_key(self, key):
         return self.noext+key
 
@@ -60,12 +66,15 @@ class standard(target):
     def __init__(self,name):
         target.__init__(self,name)
         self.idname = rt.makesetups(self.name,'std')
+        self.header = self.read_header()
         self.date = self.name.split('P')[1][0:8]
         self.sens = self.idname+'.fits'
         self.sensout = self.idname+'_'+self.date
-        self.object= (rt.header(self.name,'OBJECT')).lower()
+        self.object = self.header['OBJECT'].lower()
         self.oned0 = self.insert_key('ws.0001.fits')
-        self.oned = self.insert_key('ws1d.fits')    
+        self.oned = self.insert_key('ws1d.fits')
+    def read_header(self):
+        return fits.getheader(self.name)    
     def __str__(self):
         return self.name+' : sensitivity function --> '+self.sens        
 
@@ -163,7 +172,7 @@ class rsspipe(object):
         hduvarimg.writeto(obj.var)    
         rt.prepare_image(images, do_error=do_error)
         self.rssidentify(arc)
-        nxpix = rt.header(images, 'NAXIS1')
+        nxpix = obj.header['NAXIS1']
         rt.loadparam(self.rssconfig, ['iraf.transform', 'iraf.fit1d'])
         config= self.rssconfig
         if self.do_error:
@@ -183,7 +192,8 @@ class rsspipe(object):
         # Calibrated error file
         if do_error:
             iraf.transform(obj.var, obj.wave_var, fitnames = arc.noext, logfiles = self.logfile)
-            iraf.gfit1d(obj.wave, 'tmptab.tab', function=config['iraf.fit1d']['function'], order=config['iraf.fit1d']['order'], xmin=1, xmax=nxpix, interactive='no')		       
+            iraf.gfit1d(obj.wave, 'tmptab.tab', function=config['iraf.fit1d']['function'], 
+                        order=config['iraf.fit1d']['order'], xmin=1, xmax=nxpix, interactive='no')		       
             iraf.tabpar('tmptab.tab',"rms", 1, Stdout=self.logfile)
             rmsval = float(iraf.tabpar.value)
             tmpval=rmsval*rmsval
@@ -210,7 +220,6 @@ class rsspipe(object):
         # Sensitivity files    
         iraf.sensfunc(std.sensout, std.sensout+'.fits', interactive= 'yes', extinct=self.extinction,
                       newextinction='extinct.dat')
-        #rt.putheader(std.sensout+'.fits', 'FITSNAME', ','.join([std.name for std in obj]))
         rt.getsh('cp %s %s' %  (std.sensout+'.fits',self.rssdatadir)) 
         return std.sensout+'.fits'
         
